@@ -22,9 +22,17 @@ from numpy import median
 cc = 299792458
 G = 6.67408*10**(-11)
 og = 5e-5
-############
 
-############ DATA
+###### CMB DATA #######
+Rcmb = 1.7382   #######
+dRcmb = 0.0088  #######
+z_rec = 1092    #######
+#######################
+
+
+############ DATA ###########
+#        ON THINKPAD        #
+#############################
 #JLA (zcmb dz mb dmb x1 dx1 color dcolor hm)
 jla = pd.read_csv('/home/kj/dust/sn_data/jla_lcparams.txt',
  delim_whitespace = True, header = 0)
@@ -46,23 +54,39 @@ pb_sys = np.loadtxt('/home/kj/dust/sn_data/syscov_panth.txt')
 pb_cm = pb_stat + pb_sys
 pb_icm = np.linalg.inv(pb_cm)
 
-###### CMB DATA #######
-Rcmb = 1.7382   #######
-dRcmb = 0.0088  #######
-z_rec = 1092    #######
-#######################
+"""
+############ DATA ###########
+#          ON SNOVA         #
+#############################
+#JLA (zcmb dz mb dmb x1 dx1 color dcolor hm)
+jla = pd.read_csv('/home/kajo2802/dust/sn_data/jla_lcparams.txt',
+ delim_whitespace = True, header = 0)
+#Binned JLA 
+jb = pd.read_csv('/home/kajo2802/dust/sn_data/dist_binned.txt',
+ delim_whitespace=True, header=None, names=['zb', 'mub'])
+jb_cm = np.loadtxt('/home/kajo2802/dust/sn_data/covmat_binned.txt')
+jb_cm *= 1e-6
+jb_icm = np.linalg.inv(jb_cm)
+#PANTHEON
+#full long corrected (zcmb, mb, dmb)
+pc = pd.read_csv('/home/kajo2802/dust/sn_data/lcparam_full_long.txt',
+ delim_whitespace = True, header = 0)
+#binned (zcmb, mb, dmb)
+pb = pd.read_csv('/home/kajo2802/dust/sn_data/lcparam_DS17f.txt',
+ delim_whitespace = True, header = 0)
+pb_stat = np.diag((pb.dmb.values)**2)
+pb_sys = np.loadtxt('/home/kajo2802/dust/sn_data/syscov_panth.txt')
+pb_cm = pb_stat + pb_sys
+pb_icm = np.linalg.inv(pb_cm)
 
+### DON'T FORGET TO CHANGE IN mu_cov(a,b)
+"""
 
-
-
-########### FUNCTIONS #################
-
-
-
-
-
-
-
+#############################################################################
+#############################################################################
+################################# FUNCTIONS #################################
+#############################################################################
+#############################################################################
 
 
 ######### EXTINCTION CCM89 ##########
@@ -172,10 +196,13 @@ def cmb_chisq(om, h0, w0, wa):
 #redshift for use in interpolation
 z50 = np.linspace(0.001, 2.26, 50)
 
-################################################
-################### MULTINEST ##################
-################################################
 
+
+###################################################################
+###################################################################
+########################### MULTINEST #############################
+###################################################################
+###################################################################
 
 
 
@@ -781,7 +808,7 @@ def prior_pbd_wzcdm(cube, ndim, nparam):
 
 
 def prior_general(cube, ndim, nparam):
-	cube[0] = cube[0]*2 #om
+	cube[0] = cube[0] #om
 	cube[0] = cube[0]*50+50 #h0
 	cube[0] = cube[0]*10-25 #MB
 	cube[0] = cube[0]*6-4 #w0
@@ -792,39 +819,36 @@ def prior_general(cube, ndim, nparam):
 	cube[0] = cube[0]*10-10 #log od
 	cube[0] = cube[0]*9-6 #gamma
 
-#add cmb+bao priors
 
-
-
-
-
-
-
-
-
-
+#set cmb to 1 to include cmb
 cmb = 0
+npoints = 2000
+
 start = time()
-pmn.run(llhood_jlac_flcdm, prior_jlac_flcdm, 5, verbose = True, n_live_points = 2000)
-pmn.run(llhood_jlac_wcdm, prior_jlac_wcdm, 6, verbose = True, n_live_points = 2000)
-pmn.run(llhood_jlac_wzcdm, prior_jlac_wzcdm, 7, verbose = True, n_live_points = 2000)
-pmn.run(llhood_jlad_flcdm, prior_jlad_flcdm, 7, verbose = True, n_live_points = 2000)
-pmn.run(llhood_jlad_wcdm, prior_jlad_wcdm, 8, verbose = True, n_live_points = 2000)
-pmn.run(llhood_jlad_wzcdm, prior_jlad_wzcdm, 9, verbose = True, n_live_points = 2000)
-
-pmn.run(llhood_jbc_flcdm, prior_jbc_flcdm, 2, verbose = True, n_live_points = 2000)
-pmn.run(llhood_jbc_wcdm, prior_jbc_wcdm, 3, verbose = True, n_live_points = 2000)
-pmn.run(llhood_jbc_wzcdm, prior_jbc_wzcdm, 4, verbose = True, n_live_points = 2000)
-pmn.run(llhood_jbd_flcdm, prior_jbd_flcdm, 4, verbose = True, n_live_points = 2000)
-pmn.run(llhood_jbd_wcdm, prior_jbd_wcdm, 5, verbose = True, n_live_points = 2000)
-pmn.run(llhood_jbd_wzcdm, prior_jbd_wzcdm, 6, verbose = True, n_live_points = 2000)
-
-pmn.run(llhood_pbc_flcdm, prior_pbc_flcdm, 3, verbose = True, n_live_points = 2000)
-pmn.run(llhood_pbc_wcdm, prior_pbc_wcdm, 4, verbose = True, n_live_points = 2000)
-pmn.run(llhood_pbc_wzcdm, prior_pbc_wzcdm, 5, verbose = True, n_live_points = 2000)
-pmn.run(llhood_pbd_flcdm, prior_pbd_flcdm, 5, verbose = True, n_live_points = 2000)
-pmn.run(llhood_pbd_wcdm, prior_pbd_wcdm, 6, verbose = True, n_live_points = 2000)
-pmn.run(llhood_pbd_wzcdm, prior_pbd_wzcdm, 7, verbose = True, n_live_points = 2000)
+#FULL JLA
+#pmn.run(llhood_jlac_flcdm, prior_jlac_flcdm, 5, verbose = True, n_live_points = npoints)
+#pmn.run(llhood_jlac_wcdm, prior_jlac_wcdm, 6, verbose = True, n_live_points = npoints)
+#pmn.run(llhood_jlac_wzcdm, prior_jlac_wzcdm, 7, verbose = True, n_live_points = npoints)
+#FULL JLA + DUST
+#pmn.run(llhood_jlad_flcdm, prior_jlad_flcdm, 7, verbose = True, n_live_points = npoints)
+#pmn.run(llhood_jlad_wcdm, prior_jlad_wcdm, 8, verbose = True, n_live_points = npoints)
+#pmn.run(llhood_jlad_wzcdm, prior_jlad_wzcdm, 9, verbose = True, n_live_points = np)
+#BINNED JLA
+#pmn.run(llhood_jbc_flcdm, prior_jbc_flcdm, 2, verbose = True, n_live_points = npoints)
+#pmn.run(llhood_jbc_wcdm, prior_jbc_wcdm, 3, verbose = True, n_live_points = npoints)
+#pmn.run(llhood_jbc_wzcdm, prior_jbc_wzcdm, 4, verbose = True, n_live_points = npoints)
+#BINNED JLA + DUST
+#pmn.run(llhood_jbd_flcdm, prior_jbd_flcdm, 4, verbose = True, n_live_points = npoints)
+#pmn.run(llhood_jbd_wcdm, prior_jbd_wcdm, 5, verbose = True, n_live_points = npoints)
+#pmn.run(llhood_jbd_wzcdm, prior_jbd_wzcdm, 6, verbose = True, n_live_points = npoints)
+#BINNED PANTHEON
+#pmn.run(llhood_pbc_flcdm, prior_pbc_flcdm, 3, verbose = True, n_live_points = npoints)
+#pmn.run(llhood_pbc_wcdm, prior_pbc_wcdm, 4, verbose = True, n_live_points = npoints)
+#pmn.run(llhood_pbc_wzcdm, prior_pbc_wzcdm, 5, verbose = True, n_live_points = npoints)
+#BINNED PANTHEON + DUST
+#pmn.run(llhood_pbd_flcdm, prior_pbd_flcdm, 5, verbose = True, n_live_points = npoints)
+#pmn.run(llhood_pbd_wcdm, prior_pbd_wcdm, 6, verbose = True, n_live_points = npoints)
+#pmn.run(llhood_pbd_wzcdm, prior_pbd_wzcdm, 7, verbose = True, n_live_points = npoints)
 end = time()
 print('sampler time', end-start)
 
