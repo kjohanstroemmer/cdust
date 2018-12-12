@@ -53,6 +53,13 @@ pb_stat = np.diag((pb.dmb.values)**2)
 pb_sys = np.loadtxt('/home/kj/dust/sn_data/syscov_panth.txt')
 pb_cm = pb_stat + pb_sys
 pb_icm = np.linalg.inv(pb_cm)
+#ZTF
+ztf = pd.read_csv('/home/kj/dust/sn_data/ztf_msip.dat', 
+	delim_whitespace = True, header = 0)
+
+
+
+
 
 """
 ############ DATA ###########
@@ -78,9 +85,23 @@ pb_stat = np.diag((pb.dmb.values)**2)
 pb_sys = np.loadtxt('/home/kajo2802/dust/sn_data/syscov_panth.txt')
 pb_cm = pb_stat + pb_sys
 pb_icm = np.linalg.inv(pb_cm)
+#ZTF
+ztf = pd.read_csv('/home/kajo2802/dust/sn_data/ztf_msip.dat', 
+	delim_whitespace = True, header = 0)
 
 ### DON'T FORGET TO CHANGE IN mu_cov(a,b)
 """
+
+
+lowz = ztf.z.values
+lowd = ztf.dmu.values
+C1 = np.diag(lowd**2)
+#ZTF+PANTHEON
+C2 = pb_cm[12:, 12:]
+C3 = np.bmat([[C1, np.zeros((8, 28))], [np.zeros((28, 8)), C2]])
+C41 = np.linalg.inv(C3)
+C4 = np.asarray(C41)
+
 
 #############################################################################
 #############################################################################
@@ -141,7 +162,7 @@ def E_far(om, h0, z, w0, wa):
 #Define luminosity distance. H0 removed: log(DL) = log(I)-log(H0)
 def DL_far(om, h0, z_max, w0, wa):
 	res = quad(lambda z: 1 / E_far(om, h0, z, w0, wa), 0, z_max)
-	return c/h0/1000*(1.+z_max) * res[0]
+	return cc/h0/1000*(1.+z_max) * res[0]
 
 ### COSMOLOGY WITHOUT RADIATION
 def E(om, z, w0, wa):
@@ -151,7 +172,7 @@ def E(om, z, w0, wa):
 #Define luminosity distance. 
 def DL(om, z_max, w0, wa):
     res = integrate.quad(lambda z: 1 / E(om, z, w0, wa), 0, z_max)
-    return c/1000*(1.+z_max) * res[0]
+    return cc/1000*(1.+z_max) * res[0]
 
 #Define attenuation function
 def attenuation(om, h0, z_max, w0, wa, gamma):
@@ -187,7 +208,7 @@ def mu_cov(alpha, beta):
 def cmb_chisq(om, h0, w0, wa):
 	h = h0/100
 	om_cmb = om*h**2
-	R = np.sqrt(om_cmb*h0**2)*DL_far(om_cmb, h0, z_rec, w0, wa)/c
+	R = np.sqrt(om_cmb*h0**2)*DL_far(om_cmb, h0, z_rec, w0, wa)/cc
 	chisq = (R-Rcmb)**2/dRcmb**2
 	return chisq
 
@@ -195,6 +216,42 @@ def cmb_chisq(om, h0, w0, wa):
 
 #redshift for use in interpolation
 z50 = np.linspace(0.001, 2.26, 50)
+
+
+
+
+
+
+
+
+#GENERATED SETS
+#generation parameters
+om_gen = 0.3
+h0_gen = 70
+w0_gen = -1
+wa_gen = 0
+od_gen = 8e-5
+g_gen = -1
+
+#ZTF+PANTHEON
+
+#print(lowz)
+#print(pb.zcmb.values[12:])
+z_zp = np.concatenate((lowz, pb.zcmb.values[12:]))
+#z_zp = np.asarray(z_zp)
+dust_gen = []
+for m in range(0, len(z_zp)):
+	dgg = od_gen*attenuation(om_gen, h0_gen, z_zp[m], w0_gen, wa_gen, g_gen)
+	dust_gen.append(dgg)
+
+LD_gen = FlatLambdaCDM(h0_gen, om_gen).luminosity_distance(z_zp).value
+mod_gen = 5*np.log10(LD_gen) + 25 + dust_gen
+
+
+
+
+
+
 
 
 
@@ -520,16 +577,16 @@ def llhood_jbd_flcdm(model_param, ndim, nparam):
 	wa = 0
 
 	A = []
-	for i in range(0,50):
-		At = 10**(od)*attenuation(om, h0, z50[i], w0, wa, g)
+	for i in range(0,len(jb.zb.values)):
+		At = 10**(od)*attenuation(om, h0, jb.zb.values[i], w0, wa, g)
 		A.append(At)
-	A_inter = interp1d(z50, A)
-	DUST = A_inter(jb.zb.values)
+	#A_inter = interp1d(z50, A)
+	#DUST = A_inter(jb.zb.values)
 
 	dist_th = FlatLambdaCDM(h0, om).luminosity_distance(jb.zb.values).value
 	mod_th = 5*np.log10(dist_th) + 25
 
-	hub_res = jb.mub.values - mod_th - DUST
+	hub_res = jb.mub.values - mod_th - A
 
 	chisq = np.dot(hub_res.T, np.dot(jb_icm, hub_res))
 
@@ -552,16 +609,16 @@ def llhood_jbd_wcdm(model_param, ndim, nparam):
 	wa = 0
 
 	A = []
-	for i in range(0,50):
-		At = 10**(od)*attenuation(om, h0, z50[i], w0, wa, g)
+	for i in range(0,len(jb.zb.values)):
+		At = 10**(od)*attenuation(om, h0, jb.zb.values[i], w0, wa, g)
 		A.append(At)
-	A_inter = interp1d(z50, A)
-	DUST = A_inter(jb.zb.values)
+	#A_inter = interp1d(z50, A)
+	#DUST = A_inter(jb.zb.values)
 
 	dist_th = wCDM(h0, om, 1-om, w0).luminosity_distance(jb.zb.values).value
 	mod_th = 5*np.log10(dist_th) + 25
 
-	hub_res = jb.mub.values - mod_th - DUST
+	hub_res = jb.mub.values - mod_th - A
 
 	chisq = np.dot(hub_res.T, np.dot(jb_icm, hub_res))
 
@@ -585,16 +642,16 @@ def llhood_jbd_wzcdm(model_param, ndim, nparam):
 
 
 	A = []
-	for i in range(0,50):
-		At = 10**(od)*attenuation(om, h0, z50[i], w0, wa, g)
+	for i in range(0,len(jb.zb.values)):
+		At = 10**(od)*attenuation(om, h0, jb.zb.values[i], w0, wa, g)
 		A.append(At)
-	A_inter = interp1d(z50, A)
-	DUST = A_inter(jb.zb.values)
+	#A_inter = interp1d(z50, A)
+	#DUST = A_inter(jb.zb.values)
 
 	dist_th = w0waCDM(h0, om, 1-om, w0, wa).luminosity_distance(jb.zb.values).value
 	mod_th = 5*np.log10(dist_th) + 25
 
-	hub_res = jb.mub.values - mod_th
+	hub_res = jb.mub.values - mod_th - A
 
 	chisq = np.dot(hub_res.T, np.dot(jb_icm, hub_res))
 
@@ -676,7 +733,7 @@ def prior_pbc_wcdm(cube, ndim, nparam):
 def llhood_pbc_wzcdm(model_param, ndim, nparam):
 	om, h0, w0, wa, MB = [model_param[i] for i in range(5)]
 
-	dist_th = FlatLambdaCDM(h0, om).luminosity_distance(pb.zcmb.values).value
+	dist_th = w0waCDM(h0, om, 1-om, w0, wa).luminosity_distance(pb.zcmb.values).value
 	mod_th = 5*np.log10(dist_th) + 25
 
 	hub_res = pb.mb.values - mod_th - MB
@@ -705,16 +762,16 @@ def llhood_pbd_flcdm(model_param, ndim, nparam):
 	wa = 0
 
 	A = []
-	for i in range(0,50):
-		At = 10**(od)*attenuation(om, h0, z50[i], w0, wa, g)
+	for i in range(0,len(pb.zcmb.values)):
+		At = 10**(od)*attenuation(om, h0, pb.zcmb.values[i], w0, wa, g)
 		A.append(At)
-	A_inter = interp1d(z50, A)
-	DUST = A_inter(pb.zcmb.values)
+	#A_inter = interp1d(z50, A)
+	#DUST = A_inter(pb.zcmb.values)
 
 	dist_th = FlatLambdaCDM(h0, om).luminosity_distance(pb.zcmb.values).value
 	mod_th = 5*np.log10(dist_th) + 25
 
-	hub_res = pb.mb.values - mod_th - MB - DUST
+	hub_res = pb.mb.values - mod_th - MB - A
 
 	chisq = np.dot(hub_res.T, np.dot(pb_icm, hub_res))
 
@@ -741,16 +798,16 @@ def llhood_pbd_wcdm(model_param, ndim, nparam):
 	wa = 0
 
 	A = []
-	for i in range(0,50):
-		At = 10**(od)*attenuation(om, h0, z50[i], w0, wa, g)
+	for i in range(0,len(pb.zcmb.values)):
+		At = 10**(od)*attenuation(om, h0, pb.zcmb.values[i], w0, wa, g)
 		A.append(At)
-	A_inter = interp1d(z50, A)
-	DUST = A_inter(pb.zcmb.values)
+	#A_inter = interp1d(z50, A)
+	#DUST = A_inter(pb.zcmb.values)
 
 	dist_th = wCDM(h0, om, 1-om, w0).luminosity_distance(pb.zcmb.values).value
 	mod_th = 5*np.log10(dist_th) + 25
 
-	hub_res = pb.mb.values - mod_th - MB - DUST
+	hub_res = pb.mb.values - mod_th - MB - A
 
 	chisq = np.dot(hub_res.T, np.dot(pb_icm, hub_res))
 
@@ -775,16 +832,16 @@ def llhood_pbd_wzcdm(model_param, ndim, nparam):
 	om, h0, w0, wa, MB, od, g = [model_param[i] for i in range(7)]
 
 	A = []
-	for i in range(0,50):
-		At = 10**(od)*attenuation(om, h0, z50[i], w0, wa, g)
+	for i in range(0,len(pb.zcmb.values)):
+		At = 10**(od)*attenuation(om, h0, pb.zcmb.values[i], w0, wa, g)
 		A.append(At)
-	A_inter = interp1d(z50, A)
-	DUST = A_inter(pb.zcmb.values)
+	#A_inter = interp1d(z50, A)
+	#DUST = A_inter(pb.zcmb.values)
 
-	dist_th = FlatLambdaCDM(h0, om).luminosity_distance(pb.zcmb.values).value
+	dist_th = w0waCDM(h0, om, 1-om, w0, wa).luminosity_distance(pb.zcmb.values).value
 	mod_th = 5*np.log10(dist_th) + 25
 
-	hub_res = pb.mb.values - mod_th - MB - DUST
+	hub_res = pb.mb.values - mod_th - MB - A
 
 	chisq = np.dot(hub_res.T, np.dot(pb_icm, hub_res))
 
@@ -805,6 +862,35 @@ def prior_pbd_wzcdm(cube, ndim, nparam):
 
 
 
+####################################################
+################## ZTF + PANTHEON ##################
+####################################################
+
+def llhood_zp_flcdm(model_param, ndim, nparam):
+	om, od, g = [model_param[i] for i in range(3)]
+
+	h0 = 70
+	A = []
+	for k in range(0, len(z_zp)):
+		At = 10**(od)*attenuation(om, h0, z_zp[k], -1, 0, g)
+		A.append(At)
+
+	dist_th = FlatLambdaCDM(h0, om).luminosity_distance(z_zp).value
+	mod_th = 5*np.log10(dist_th) + 25
+
+	hub_res = mod_gen - mod_th - A
+
+	chisq = np.dot(hub_res.T, np.dot(C4, hub_res))
+
+	return -0.5*chisq
+
+def prior_zp_flcdm(cube, ndim, nparam):
+	cube[0] = cube[0]
+	#cube[1] = cube[1]*50+50
+	cube[1] = cube[1]*10-10
+	cube[2] = cube[2]*9-6
+
+
 
 
 def prior_general(cube, ndim, nparam):
@@ -822,7 +908,7 @@ def prior_general(cube, ndim, nparam):
 
 #set cmb to 1 to include cmb
 cmb = 0
-npoints = 2000
+npoints = 5000
 
 start = time()
 #FULL JLA
@@ -849,6 +935,8 @@ start = time()
 #pmn.run(llhood_pbd_flcdm, prior_pbd_flcdm, 5, verbose = True, n_live_points = npoints)
 #pmn.run(llhood_pbd_wcdm, prior_pbd_wcdm, 6, verbose = True, n_live_points = npoints)
 #pmn.run(llhood_pbd_wzcdm, prior_pbd_wzcdm, 7, verbose = True, n_live_points = npoints)
+#ZTF + PANTHEON
+pmn.run(llhood_zp_flcdm, prior_zp_flcdm, 3, verbose = True, n_live_points = npoints)
 end = time()
 print('sampler time', end-start)
 
